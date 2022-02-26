@@ -9,6 +9,10 @@ BLEServer *pServer = NULL;
 BLECharacteristic *message_characteristic = NULL;
 BLECharacteristic *box_characteristic = NULL;
 
+bool deviceConnected = false;
+bool oldDeviceConnected = false;
+uint32_t value = 0;
+
 String boxValue = "0";
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
@@ -22,11 +26,14 @@ class MyServerCallbacks : public BLEServerCallbacks
 {
   void onConnect(BLEServer *pServer)
   {
+    deviceConnected = true;
+    BLEDevice::startAdvertising();
     Serial.println("Connected");
   };
 
   void onDisconnect(BLEServer *pServer)
   {
+    deviceConnected = false;
     Serial.println("Disconnected");
   }
 };
@@ -92,13 +99,35 @@ void setup()
 
 void loop()
 {
-  message_characteristic->setValue("Message one");
-  message_characteristic->notify();
+      if (deviceConnected) {        
+        message_characteristic->setValue("Message one");
+        message_characteristic->notify();
 
-  delay(1000);
+        delay(1000);
 
-  message_characteristic->setValue("Message Two");
-  message_characteristic->notify();
+        String vSend = "Message " + String(value);
+        message_characteristic->setValue(vSend.c_str());
+        message_characteristic->notify();
+        value++;
+        Serial.println(vSend);
+        delay(1000);
+        // notify changed value
+        //pCharacteristic->setValue((uint8_t*)&value, 4);
+        //pCharacteristic->notify();
+        //value++;
+        //delay(10); // bluetooth stack will go into congestion, if too many packets are sent, in 6 hours test i was able to go as low as 3ms
+    }
+    // disconnecting
+    if (!deviceConnected && oldDeviceConnected) {
+        delay(500); // give the bluetooth stack the chance to get things ready
+        pServer->startAdvertising(); // restart advertising
+        Serial.println("start advertising");
+        oldDeviceConnected = deviceConnected;
+    }
+    // connecting
+    if (deviceConnected && !oldDeviceConnected) {
+        // do stuff here on connecting
+        oldDeviceConnected = deviceConnected;
+    }
 
-  delay(1000);
 }
